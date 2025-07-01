@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Juego Emocionante - Atrapa Girasoles</title>
+<style>
+  body {
+    margin: 0;
+    background: linear-gradient(135deg, #fceabb, #f8b500);
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    height: 100vh;
+    overflow: hidden;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+  }
+  h1 {
+    color: #b36b00;
+    text-shadow: 1px 1px 3px #f9d71c;
+    margin: 20px 0 10px 0;
+  }
+  #game-container {
+    position: relative;
+    width: 90vw;
+    max-width: 600px;
+    height: 500px;
+    background: #fff8dc;
+    border-radius: 20px;
+    box-shadow: 0 8px 20px rgba(179, 107, 0, 0.4);
+    overflow: hidden;
+  }
+  .sunflower {
+    position: absolute;
+    width: 70px;
+    height: 90px;
+    cursor: pointer;
+    user-select: none;
+    transition: transform 0.2s ease;
+    animation: float 3s ease-in-out infinite;
+    filter: drop-shadow(2px 4px 3px rgba(0,0,0,0.2));
+  }
+  .sunflower img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    pointer-events: none;
+    border-radius: 10px;
+    transition: transform 0.3s ease;
+  }
+  .sunflower:active {
+    transform: scale(0.9) rotate(-10deg);
+  }
+  #scoreboard {
+    margin-top: 15px;
+    font-size: 1.3rem;
+    color: #b36b00;
+    font-weight: 700;
+  }
+  #message {
+    margin-top: 10px;
+    font-size: 1.1rem;
+    color: #b36b00;
+    min-height: 1.5em;
+  }
+  #btn-start {
+    margin-top: 20px;
+    padding: 12px 24px;
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: white;
+    background: linear-gradient(135deg, #f9d71c, #b36b00);
+    border: none;
+    border-radius: 30px;
+    cursor: pointer;
+    box-shadow: 0 5px 15px rgba(179, 107, 0, 0.6);
+    transition: background 0.3s ease;
+  }
+  #btn-start:hover {
+    background: linear-gradient(135deg, #b36b00, #f9d71c);
+  }
+  @keyframes float {
+    0%, 100% {
+      transform: translateY(0px);
+    }
+    50% {
+      transform: translateY(-10px);
+    }
+  }
+</style>
+</head>
+<body>
+  <h1>Atrapa los Girasoles</h1>
+  <div id="game-container" aria-label="Área de juego para atrapar girasoles" role="main"></div>
+  <div id="scoreboard" aria-live="polite" aria-atomic="true">Puntaje: 0</div>
+  <div id="message" aria-live="polite"></div>
+  <canvas id="message-canvas" width="600" height="50" aria-live="polite" role="alert" style="margin-top: 10px; border-radius: 5px;"></canvas>
+  <button id="btn-start" aria-label="Iniciar juego">Iniciar Juego</button>
+
+  <script>
+    const gameContainer = document.getElementById('game-container');
+    const scoreboard = document.getElementById('scoreboard');
+    const message = document.getElementById('message');
+    const messageCanvas = document.getElementById('message-canvas');
+    const ctx = messageCanvas.getContext('2d');
+    const btnStart = document.getElementById('btn-start');
+
+    let score = 0;
+    let gameInterval = null;
+    let sunflowerInterval = null;
+    let activeSunflowers = [];
+    let animationFrameId = null;
+    let animationStartTime = null;
+    let currentMessage = '';
+
+    // Nueva imagen de girasol estilo dibujo animado
+    const sunflowerImage = "https://cdn-icons-png.flaticon.com/512/616/616607.png";
+
+    function animateMessage(timestamp) {
+      if (!animationStartTime) animationStartTime = timestamp;
+      const elapsed = timestamp - animationStartTime;
+
+      ctx.clearRect(0, 0, messageCanvas.width, messageCanvas.height);
+
+      // Animación de opacidad para fade in y fade out
+      let opacity = 1;
+      if (elapsed < 500) {
+        opacity = elapsed / 500; // fade in 0-0.5s
+      } else if (elapsed > 3500) {
+        opacity = 1 - (elapsed - 3500) / 500; // fade out 3.5-4s
+      }
+
+      ctx.globalAlpha = opacity;
+      ctx.font = '24px Segoe UI, Tahoma, Geneva, Verdana, sans-serif';
+      ctx.fillStyle = '#b36b00';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(currentMessage, messageCanvas.width / 2, messageCanvas.height / 2);
+
+      ctx.globalAlpha = 1;
+
+      if (elapsed < 4000) {
+        animationFrameId = requestAnimationFrame(animateMessage);
+      } else {
+        ctx.clearRect(0, 0, messageCanvas.width, messageCanvas.height);
+        animationFrameId = null;
+        animationStartTime = null;
+        currentMessage = '';
+      }
+    }
+
+    function showMessage(msg) {
+      if (animationFrameId) {
+        cancelAnimationFrame(animationFrameId);
+        animationFrameId = null;
+        animationStartTime = null;
+      }
+      currentMessage = msg;
+      animationFrameId = requestAnimationFrame(animateMessage);
+    }
+
+    function createSunflower() {
+      const sunflower = document.createElement('div');
+      sunflower.className = 'sunflower';
+      sunflower.style.top = Math.random() * (gameContainer.clientHeight - 90) + 'px';
+      sunflower.style.left = Math.random() * (gameContainer.clientWidth - 70) + 'px';
+
+      const img = document.createElement('img');
+      img.src = sunflowerImage;
+      img.alt = 'Girasol';
+      img.style.filter = 'invert(0%)'; // Asegurar que la imagen no sea invisible por filtro
+      sunflower.appendChild(img);
+
+      sunflower.addEventListener('click', () => {
+        score++;
+        scoreboard.textContent = 'Puntaje: ' + score;
+        const frases = [
+          'Consuelo Isabel, este girasol es para ti 🌻',
+          'Cada girasol atrapado es un recuerdo para Consuelo Isabel 🌻',
+          '¡Sigue así, Consuelo Isabel estaría orgullosa! 🌻',
+          'Un girasol más para ti, Consuelo Isabel 🌻',
+          'Los girasoles brillan como tu sonrisa, Consuelo Isabel 🌻',
+          'Cada girasol es un abrazo para Consuelo Isabel 🌻',
+          'Atrapar girasoles es recordar a Consuelo Isabel 🌻',
+          'Este girasol lleva todo mi cariño para Consuelo Isabel 🌻'
+        ];
+        const fraseAleatoria = frases[Math.floor(Math.random() * frases.length)];
+        showMessage(fraseAleatoria);
+        gameContainer.removeChild(sunflower);
+        activeSunflowers = activeSunflowers.filter(s => s !== sunflower);
+      });
+
+      gameContainer.appendChild(sunflower);
+      activeSunflowers.push(sunflower);
+
+      // El girasol desaparece después de 3 segundos si no se atrapa
+      setTimeout(() => {
+        if (gameContainer.contains(sunflower)) {
+          gameContainer.removeChild(sunflower);
+          activeSunflowers = activeSunflowers.filter(s => s !== sunflower);
+          // showMessage('Se escapó un girasol... Intenta atraparlo la próxima vez.');
+        }
+      }, 3000);
+    }
+
+    function startGame() {
+      score = 0;
+      scoreboard.textContent = 'Puntaje: 0';
+      message.textContent = '';
+      activeSunflowers.forEach(s => {
+        if (gameContainer.contains(s)) {
+          gameContainer.removeChild(s);
+        }
+      });
+      activeSunflowers = [];
+
+      sunflowerInterval = setInterval(() => {
+        if (activeSunflowers.length < 5) {
+          createSunflower();
+        }
+      }, 1500);
+
+      // Duración del juego: 30 segundos
+      gameInterval = setTimeout(() => {
+        clearInterval(sunflowerInterval);
+        showMessage('¡Juego terminado! Tu puntaje final es: ' + score);
+      }, 30000);
+    }
+
+    btnStart.addEventListener('click', () => {
+      if (gameInterval) {
+        clearTimeout(gameInterval);
+      }
+      if (sunflowerInterval) {
+        clearInterval(sunflowerInterval);
+      }
+      startGame();
+    });
+  </script>
+</body>
+</html>
+</create_file>
